@@ -1,0 +1,18 @@
+package craneSim;
+
+import java.awt.Graphics2D;
+import java.awt.Shape;
+import java.awt.geom.Point2D;
+import java.awt.geom.Point2D.Double;
+import java.awt.geom.Rectangle2D;
+import java.awt.geom.AffineTransform;
+
+interface Displayable{
+	
+	void drawStuff(Graphics2D g2);
+	/*double getTranslationX();
+	double getTranslationY();
+	Shape getFrame();
+	AffineTransform getTransform();*/
+	
+}

@@ -1,0 +1,442 @@
+package craneSim;
+
+import java.util.*;
+import java.awt.Rectangle;
+import java.awt.Polygon;
+import java.awt.geom.Point2D;
+import java.awt.geom.Point2D.Double;
+import java.awt.geom.NoninvertibleTransformException;
+import java.awt.geom.RectangularShape;
+import java.awt.geom.Rectangle2D;
+import java.awt.Shape;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Color;
+import java.awt.geom.AffineTransform;
+import java.awt.Stroke;
+import java.awt.BasicStroke;
+
+public class Crane implements Displayable{
+
+	private Vector<DisplayableObject> displayables;
+        private BlockWorld blockified;
+	
+	private DisplayableObject tracks;
+	private DisplayableObject body;
+	private DisplayableObject triangle;
+	
+	private DisplayableObject arm1;
+	private DisplayableObject arm2;
+	private DisplayableObject arm3;
+	private DisplayableObject arm4;
+	
+	private DisplayableObject magnet;
+        private double shift;
+    private static int ground = 380;
+    private float dashPosition = 0.0f;
+    private boolean isStroked = false;
+
+	class Body extends DisplayableObject{
+		
+		Body(int w, int h, Color c){
+			
+			super();
+			width = w;
+			height = h;
+			drawMeIn = c;			
+		}
+
+	        /* drawStuff draws a component. This function behaves almost identically for all Displayable Objects */
+		public void drawStuff(Graphics2D g2){
+			
+		        /* position the graphics object based on the components relative position to it*/
+			g2.transform(myTransform);
+
+			/* keep track of where this component is relative to the top left corner of the screen */
+			positionInCrane.concatenate(g2.getTransform());
+			
+			/* draw */			
+			g2.setColor(drawMeIn);
+			g2.fillRoundRect(0, 0, width, height, 10, 10);
+			g2.setColor(Color.BLACK);
+			Stroke stroke = g2.getStroke();
+			if(isStroked){
+			    //Stroke stroke = new BasicStroke();
+			    //stroke = g2.getStroke();
+			    float dash[] = {8.0f};
+			    g2.setStroke(new BasicStroke(8.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 8.0f, dash, dashPosition));
+			    }
+			g2.drawRoundRect(0, 0, width, height, 10, 10);
+			g2.setStroke(stroke);
+			
+		}
+		
+	}
+
+	class Arm extends DisplayableObject{
+		
+		Arm(double angl, Point2D anch, Color c){
+			
+			super();
+			angle = angl;
+			anchor = new Point2D.Double();
+			anchor.setLocation(anch);
+			width = 80;
+			height = 20;
+			drawMeIn = c;			
+		}
+				
+		public void drawStuff(Graphics2D g2){
+		
+			g2.transform(myTransform);
+			positionInCrane.concatenate(g2.getTransform());
+			
+			g2.setColor(drawMeIn);
+			g2.fillRect(0, 0, width, height);
+			g2.setColor(Color.BLACK);
+			g2.drawRect(0, 0, width, height);
+			
+		}
+	}
+
+	class Triangle extends DisplayableObject{
+		
+		Triangle(int[] xpoints, int[] ypoints, Color c){
+			
+			super();
+			frame = new Polygon(xpoints, ypoints, 3);
+			drawMeIn = c;			
+		}		
+
+		public void drawStuff(Graphics2D g2){
+			
+			g2.transform(myTransform);
+			positionInCrane.concatenate(g2.getTransform());
+			
+			g2.setColor(drawMeIn);
+			g2.fillPolygon((Polygon)frame);
+			g2.setColor(Color.BLACK);
+			g2.drawPolygon((Polygon)frame);			
+		}
+	}
+
+	class Magnet extends DisplayableObject{
+
+		Magnet(Color c){
+			
+			super(); 
+			width = 15;
+			height = 50;
+			drawMeIn = c;			
+		}
+		
+		public void drawStuff(Graphics2D g2){
+			
+		    g2.transform(myTransform);
+		    positionInCrane.concatenate(g2.getTransform());
+			
+		    g2.setColor(drawMeIn);
+		    g2.fillRect(0, 0, width, height);
+	            g2.setColor(Color.BLACK);
+		    g2.drawRect(0, 0, width, height);
+		}
+	}
+	
+	public Crane(BlockWorld b){
+
+		super();		
+		initializeBody();
+		initializeArms();
+		initializeDisplayables();
+		blockified = b;
+	}
+	
+        /* drawStuff calls each component to draw itself */
+	public void drawStuff(Graphics2D g2){
+		
+	    /* get each displayable component to draw itself */ 
+	    for(int i = 0; i < displayables.size(); i++){
+
+		if(i == 0){
+		    isStroked = true;
+		    }
+
+		/* reset each components position in crane */
+	        displayables.get(i).getPositionInCrane().setToIdentity();
+
+		/* draw */
+	        displayables.get(i).drawStuff(g2);
+		
+		isStroked = false;
+	    }
+
+	}
+	
+        /* horizontalShift moves the crane horizontally */
+	public void horizontalShift(int shft){
+		
+	    dashPosition += shft;
+		AffineTransform shifted = new AffineTransform();
+		shifted.translate(shft, 0);
+
+		/* shift the starting position of the crane */ 
+		displayables.get(0).getMyTransform().preConcatenate(shifted);
+		
+	}
+	
+	public void initializeArms(){
+		
+		/* translate coordinates and anchor points for arms */	        
+		Point2D armAnchor = new Point2D.Double(5, 15);
+		
+		arm1 = new Arm(-Math.PI/4.0, armAnchor, Color.GREEN);
+		arm2 = new Arm(0.3, armAnchor, Color.GREEN);
+		arm3 = new Arm(0.3, armAnchor, Color.GREEN);
+		arm4 = new Arm(0.3, armAnchor, Color.GREEN);
+		magnet = new Magnet(Color.GREEN);
+
+		Point2D arm1Position = new Point2D.Double(15, -8);
+		Point2D armPosition = new Point2D.Double(arm1.getWidth() - 15, 0);
+		
+		arm1.getMyTransform().translate(arm1Position.getX(), arm1Position.getY());
+		arm1.getMyTransform().rotate(-Math.PI/4.0, armAnchor.getX(), armAnchor.getY());
+
+		arm2.getMyTransform().translate(armPosition.getX(), armPosition.getY());
+		arm2.getMyTransform().rotate(0.3, armAnchor.getX(), armAnchor.getY());		
+
+		arm3.getMyTransform().translate(armPosition.getX(), armPosition.getY());
+		arm3.getMyTransform().rotate(0.3, armAnchor.getX(), armAnchor.getY());
+
+		arm4.getMyTransform().translate(armPosition.getX(), armPosition.getY());
+		arm4.getMyTransform().rotate(0.3, armAnchor.getX(), armAnchor.getY());
+
+		magnet.getMyTransform().translate(70, -15);
+	}
+	
+	public void initializeBody(){
+		
+		/* translate coordinates for body parts */
+		Point2D trackPosition = new Point2D.Double(10, 350);
+		Point2D bodyPosition = new Point2D.Double(20, -80);
+		Point2D trianglePosition = new Point2D.Double(36, -20);
+		
+		tracks = new Body(160, 30, Color.WHITE);
+		body = new Body(100, 80, Color.BLUE);
+		
+		int[] xpoints = {0, 15, 30};
+		int[] ypoints = {20, 0, 20};
+		triangle = new Triangle(xpoints, ypoints, Color.BLUE);
+		
+		tracks.getMyTransform().translate(trackPosition.getX(), trackPosition.getY());
+		body.getMyTransform().translate(bodyPosition.getX(), bodyPosition.getY());
+		triangle.getMyTransform().translate(trianglePosition.getX(), trianglePosition.getY());		
+	}
+	
+	public void initializeDisplayables(){
+		
+		displayables = new Vector<DisplayableObject>(5);		
+		displayables.add(tracks);
+		displayables.add(body);
+		displayables.add(triangle);
+		displayables.add(arm1);
+		displayables.add(arm2);
+		displayables.add(arm3);
+		displayables.add(arm4);
+		displayables.add(magnet);
+	}
+	
+	public void determineRotation(int index, Point2D mTrans){
+		
+		DisplayableObject movedArm = new DisplayableObject();
+		movedArm = displayables.get(index);
+		
+		Point2D axis = new Point2D.Double();
+		axis.setLocation(movedArm.getWidth(), movedArm.getAnchorY());
+		
+		/* create a vector along the rotation axis and a vector to the mouse point */
+		Point2D vector1 = new Point2D.Double(mTrans.getX() - movedArm.getAnchorX(),
+				mTrans.getY() - movedArm.getAnchorY());
+		
+		Point2D vector2 = new Point2D.Double(axis.getX() - movedArm.getAnchorX(),
+				axis.getY() - movedArm.getAnchorY());
+		
+		/* calculate dot product, magnitude */
+		double dotProduct = (vector1.getX() * vector2.getX())
+				+ (vector1.getY() * vector2.getY());
+		
+		double magAnchorAxis = 
+				Math.sqrt(Math.pow(vector2.getX(), 2) + Math.pow(vector2.getY(), 2));
+		
+		double magMousePoint = 
+				Math.sqrt(Math.pow(vector1.getX(), 2) + Math.pow(vector1.getY(), 2));
+		
+		/* determine the rotation value */
+		double cosArg = dotProduct / (magAnchorAxis * magMousePoint);
+		
+		double theta = Math.acos(cosArg);
+	     
+		if(mTrans.getY() < axis.getY()){
+			theta = -1 * theta;
+		}
+		
+		/* update angle of arm */
+		displayables.get(index).getMyTransform().rotate(theta, displayables.get(index).getAnchorX(),
+				                                       displayables.get(index).getAnchorY());
+	
+	}
+        
+      public void notify(Point2D mp){
+
+        /* determine if mouse is in the lower part of the crane */
+        for(int i = 0; i < displayables.size() - 1; i++){
+					
+          /* transform mouse coordinates by components position in crane*/
+	  Point2D reverseMouse = new Point2D.Double();
+	  try{
+	      reverseMouse = displayables.get(i).getPositionInCrane().inverseTransform(mp, null);
+	  }
+	  catch(NoninvertibleTransformException k){
+	    k.printStackTrace();
+	  }
+	
+	  /* check to see if the mouse point is contained in one of the components */
+	  if(checkContainment(reverseMouse, displayables.get(i).getWidth(), displayables.get(i).getHeight())){
+						
+	      if(i > 2){
+
+	        /* mouse coordinates contained in one of the arms */
+							
+	        determineRotation(i, reverseMouse);
+	        return;
+							
+	    }
+						
+	    /* mouse coordinates contained in one of the lower components */	
+	    /* move the crane horizontally */
+		
+	    shift = mp.getX() - shift;				
+	    horizontalShift((int)shift);
+
+	    /* update shift and exit */
+	    shift = mp.getX();
+	    return;
+						
+	  }
+					
+	  /* mouse point not contained in this component, continue */
+	  continue;
+	}
+				
+      }
+
+    public void notifyPress(double initialPoint){
+
+	shift = initialPoint;
+    }
+
+    /* checkContainment checks to see whether a given mouse point is in a certain component */
+    public boolean checkContainment(Point2D mouseTransform, int width, int height){
+
+	if((mouseTransform.getX() < width) && (mouseTransform.getX() > 0)){
+	    if((mouseTransform.getY() < height) && (mouseTransform.getY() > 0)) return true;
+	}
+
+	return false;
+    }
+
+    /* inMagnet returns whether or not a given mouse point is contained in the magnet */
+    public boolean inMagnet(Point2D mousePoint){
+
+	DisplayableObject mag = displayables.get(7);
+
+	Point2D reverseMouse = new Point2D.Double();
+	try{
+            reverseMouse = mag.getPositionInCrane().inverseTransform(mousePoint, null);
+        }
+        catch(NoninvertibleTransformException k){
+          k.printStackTrace();
+        }
+
+	if(checkContainment(reverseMouse, mag.getWidth(), mag.getHeight())){
+	    return true;
+	}
+       
+	return false;
+    }
+
+    /* holdingBlock returns whether or not the magnet is holding a block */
+    public boolean holdingBlock(){
+
+	DisplayableObject lastDisplayable = displayables.get((displayables.size() - 1));
+	if(lastDisplayable.isOnMagnet()){
+	    return true;
+	}
+      
+	return false;
+    }
+	
+    public void removeBlock(){
+
+	boolean success = false;
+	DisplayableObject magnetBlock = displayables.lastElement();
+	Shape magnetBlockFrame = new Rectangle2D.Double(0, 0, magnetBlock.getWidth(), magnetBlock.getHeight());
+
+	Shape transformedShape = magnetBlock.getPositionInCrane().createTransformedShape(magnetBlockFrame);
+	Rectangle2D boundingBox = transformedShape.getBounds2D();
+	
+	Rectangle2D groundBound = new Rectangle2D.Double(boundingBox.getX(), ground - 5, boundingBox.getWidth(), 10);
+	Rectangle2D intersection = boundingBox.createIntersection(groundBound);
+
+	double magnetBase = boundingBox.getY() + boundingBox.getHeight();
+
+	if((magnetBase <= (ground + 5)) && (magnetBase >= (ground - 5))){
+	    System.out.println("success");
+	    System.out.println("transformed y = " + boundingBox.getY());
+	    success = true;
+	}
+
+	displayables.remove((displayables.size() - 1));
+	blockified.blockWorldAdd(boundingBox, success);
+    }
+
+    /* grabBlock adds a block to the crane if the magnet is properly positioned; it simply returns otherwise */
+    public void grabBlock(){
+
+	Vector<DisplayableObject> blokes = blockified.getBlocks();
+	DisplayableObject maggie = displayables.get((displayables.size() - 1));
+
+	Point2D maggieTop = new Point2D.Double(maggie.getWidth(), 0);
+	Point2D maggieBottom = new Point2D.Double(maggie.getWidth(), maggie.getHeight());
+
+	/* create a mapping from the magnet back to the top left corner of the screen */
+	AffineTransform reversePosition = new AffineTransform();
+	try{
+	    reversePosition = maggie.getPositionInCrane().createInverse();
+	  }
+	  catch(NoninvertibleTransformException k){
+	    k.printStackTrace();
+	  }
+
+	/* map blocks through reversePosition until you find one that intersects with the magnet */
+	for(int i = 0; i < blokes.size(); i++){
+
+	    Shape transformedShape = reversePosition.createTransformedShape(blokes.get(i).getFrame());
+	    Rectangle2D bound = transformedShape.getBounds();
+  
+	    if(((Math.abs(maggie.getWidth() - bound.getX()) <= 4) && (Math.abs(maggie.getWidth() - bound.getX()) <= 4)) &&
+	       (Math.abs(0 - bound.getY()) < (1.5 * maggie.getHeight()))){//magnet and block are reasonably close
+
+		    /* add a new crane component that mimics the block in dimension */
+		    Body magnetBlock = new Body(blokes.get(i).getHeight(), blokes.get(i).getWidth(), Color.RED);
+		    magnetBlock.getMyTransform().translate(maggie.getWidth(), bound.getY());
+		    magnetBlock.setMagnet(true);
+		    displayables.add(magnetBlock);
+		    blockified.blockWorldRemove(i);
+		    return;
+		    //}
+		
+	    }
+
+	}
+    }
+}
